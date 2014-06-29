@@ -13,6 +13,7 @@ import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -31,6 +32,8 @@ public class MainActivity extends Activity implements SensorEventListener, Locat
     public static final String EXTRA_PORT = "com.qboileau.mqtt.MQTT_PORT";
     public static final String EXTRA_TOPIC = "com.qboileau.mqtt.MQTT_TOPIC";
     public static final String EXTRA_MESSAGE = "com.qboileau.mqtt.MQTT_MESSAGE";
+
+    private static final String LOG_TAG = MqttService.class.getCanonicalName();
 
     //record only changes of pressure <= or >= DELTA
     private static final long DELTA = 1;
@@ -79,7 +82,7 @@ public class MainActivity extends Activity implements SensorEventListener, Locat
                 if (isChecked) {
                     startMQTTClient();
                 } else {
-                    stopMQTTClient();
+                    stopMQTTClient(false);
                 }
             }
         });
@@ -119,13 +122,13 @@ public class MainActivity extends Activity implements SensorEventListener, Locat
         final TextView hostTF = (TextView) findViewById(R.id.hostTF);
         final TextView portTF = (TextView) findViewById(R.id.portTF);
 
-        Intent publish = new Intent(this, MqttService.class);
-        publish.setAction(MqttService.ACTION_START);
+        Intent start = new Intent(this, MqttService.class);
+        start.setAction(MqttService.ACTION_START);
         Bundle bundle = new Bundle();
         bundle.putString(EXTRA_HOST, hostTF.getText().toString());
         bundle.putInt(EXTRA_PORT, Integer.valueOf(portTF.getText().toString()));
-        publish.putExtras(bundle);
-        startService(publish);
+        start.putExtras(bundle);
+        startService(start);
         mMqttStarted = true;
     }
 
@@ -139,10 +142,14 @@ public class MainActivity extends Activity implements SensorEventListener, Locat
         }
     }
 
-    private void stopMQTTClient() {
-        Intent publish = new Intent(this, MqttService.class);
-        publish.setAction(MqttService.ACTION_STOP);
-        startService(publish);
+    private void stopMQTTClient(boolean killService) {
+        Intent stop = new Intent(this, MqttService.class);
+        stop.setAction(MqttService.ACTION_STOP);
+        if (killService) {
+            startService(stop);
+        } else {
+            stopService(stop);
+        }
         mMqttStarted = false;
     }
 
@@ -178,7 +185,11 @@ public class MainActivity extends Activity implements SensorEventListener, Locat
         if (isLocationAvailable()) {
             mLocationManager.requestLocationUpdates(mLocationProvider, 400, 1, this);
         }
-        startMQTTClient();
+
+        ToggleButton toggle = (ToggleButton) findViewById(R.id.toggleButton);
+        if (toggle.isChecked()) {
+            startMQTTClient();
+        }
     }
 
     @Override
@@ -192,7 +203,7 @@ public class MainActivity extends Activity implements SensorEventListener, Locat
         if (isLocationAvailable()) {
             mLocationManager.removeUpdates(this);
         }
-        stopMQTTClient();
+        stopMQTTClient(false);
 
     }
     @Override
@@ -205,7 +216,7 @@ public class MainActivity extends Activity implements SensorEventListener, Locat
         if (isLocationAvailable()) {
             mLocationManager.removeUpdates(this);
         }
-        stopMQTTClient();
+        stopMQTTClient(true);
     }
 
     /* Sensor API */
@@ -250,7 +261,7 @@ public class MainActivity extends Activity implements SensorEventListener, Locat
     @Override
     public void onLocationChanged(Location location) {
         this.mCurrentLocation = location;
-        System.out.println(location);
+        Log.i(LOG_TAG, location.toString());
     }
 
     @Override
